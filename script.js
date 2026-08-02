@@ -4,7 +4,7 @@ const DOOR_TIME = 0.8;
 let N = 6;
 let M = 2;
 let CAPACITY = 8;
-let SPEED = 60;
+let SPEED = 2;
 
 let matrix = [];
 let waiters = [];
@@ -160,12 +160,23 @@ function stopAt(e, f) {
   processStop(e, f);
 }
 
-function step(dt) {
-  const rate = SPEED / 3600;
+const SIM_H = 0.02;
+
+function step(realDt) {
+  let remaining = realDt * SPEED;
+  while (remaining > 1e-9) {
+    const d = Math.min(SIM_H, remaining);
+    stepOnce(d);
+    remaining -= d;
+  }
+  simHours += (realDt * SPEED) / 3600;
+}
+
+function stepOnce(simDt) {
   for (let from = 0; from < N; from++) {
     for (let to = 0; to < N; to++) {
       if (from === to) continue;
-      const expected = matrix[from][to] * rate * dt;
+      const expected = matrix[from][to] * (1 / 3600) * simDt;
       const p = expected - Math.floor(expected);
       const r = Math.random();
       let n = Math.floor(expected);
@@ -176,13 +187,13 @@ function step(dt) {
 
   for (const e of elevators) {
     if (e.stopTimer > 0) {
-      e.stopTimer -= dt;
+      e.stopTimer -= simDt;
       processStop(e, Math.round(e.pos));
       if (e.stopTimer <= 0) e.stopTimer = 0;
       continue;
     }
     const prevPos = e.pos;
-    e.pos += e.dir * ELEV_SPEED * dt;
+    e.pos += e.dir * ELEV_SPEED * simDt;
     if (e.pos >= N - 1) {
       e.pos = N - 1;
       e.dir = -1;
@@ -199,7 +210,6 @@ function step(dt) {
       stopAt(e, arrival);
     }
   }
-  simHours += (dt * SPEED) / 3600;
 }
 
 function arrivedAt(prevPos, pos, dir) {
@@ -364,14 +374,49 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
-$("#apply").addEventListener("click", () => {
-  N = clamp(+$("#n").value || 6, 2, 20);
-  M = clamp(+$("#m").value || 2, 1, 8);
-  CAPACITY = clamp(+$("#cap").value || 8, 1, 30);
-  buildMatrix();
-  buildBuilding();
-  resetSim();
+function applyConfig() {
+  const newN = clamp(Math.round(+$("#n").value) || 6, 2, 20);
+  const newM = clamp(Math.round(+$("#m").value) || 2, 1, 8);
+  const newCap = clamp(Math.round(+$("#cap").value) || 8, 1, 30);
+  if (newN !== N || newM !== M || newCap !== CAPACITY) {
+    N = newN;
+    M = newM;
+    CAPACITY = newCap;
+    buildMatrix();
+    buildBuilding();
+    resetSim();
+  }
+}
+
+["n", "m", "cap"].forEach((id) => {
+  $("#" + id).addEventListener("input", applyConfig);
+  $("#" + id).addEventListener("change", applyConfig);
 });
+
+document.addEventListener(
+  "wheel",
+  (e) => {
+    const inp = e.target.closest("input[type=number]");
+    if (!inp || inp.disabled) return;
+    e.preventDefault();
+    const step = +(inp.step || 1);
+    const dir = e.deltaY < 0 ? 1 : -1;
+    inp.value = +inp.value + dir * step;
+    inp.dispatchEvent(new Event("input"));
+    inp.dispatchEvent(new Event("change"));
+  },
+  { passive: false }
+);
+
+document.addEventListener(
+  "input",
+  (e) => {
+    if (e.target.matches && e.target.matches("#matrix input:not(:disabled)")) {
+      readMatrix();
+    }
+  },
+  { passive: true }
+);
 
 $("#randomize").addEventListener("click", () => {
   readMatrix();
@@ -392,8 +437,8 @@ $("#reset").addEventListener("click", () => {
 });
 
 $("#speed").addEventListener("input", () => {
-  SPEED = +$("#speed").value;
-  $("#speedLabel").textContent = SPEED + "x";
+  SPEED = clamp(+$("#speed").value || 1, 1, 120);
+  $("#speed").value = SPEED;
 });
 
 buildMatrix();

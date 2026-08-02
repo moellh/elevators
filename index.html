@@ -8,14 +8,12 @@
   </head>
   <body>
     <h1>Elevator Simulator</h1>
-    <p class="note">Shuttle algorithm: elevators cycle top &harr; bottom, skipping floors with no demand, and skipping waiting passengers when the cabin is full.</p>
 
     <section id="config">
       <label>Stories <input id="n" type="number" min="2" max="12" value="6" /></label>
       <label>Elevators <input id="m" type="number" min="1" max="6" value="2" /></label>
       <label>Capacity <input id="cap" type="number" min="1" max="20" value="8" /></label>
-      <label>Speed <input id="speed" type="range" min="1" max="720" step="1" value="60" /><span id="speedLabel">60x</span></label>
-      <button id="apply">Apply</button>
+      <label>Speed <input id="speed" type="number" min="1" max="120" step="1" value="2" /></label>
       <button id="randomize">Randomize</button>
       <button id="toggle">Pause</button>
       <button id="reset">Reset</button>
