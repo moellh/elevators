@@ -169,14 +169,43 @@ export class Simulation {
   }
 
   // Assign a fresh request to the elevator that can serve it soonest.
+  // With pickupThreshold > 0, a low-demand request is left unassigned until
+  // enough people accumulate to justify the fixed per-stop cost.
   dispatch(passenger, from) {
     const dir = Math.sign(passenger.target - from);
+    const { pickupThreshold, capacity } = this.config;
+
+    // Reuse an existing commitment for this floor+direction (batching).
+    let committed = -1;
+    for (let i = 0; i < this.M; i++) {
+      if (this.elevators[i].pickups.get(from) === dir) { committed = i; break; }
+    }
+    if (committed !== -1) {
+      this.elevators[committed].pickups.set(from, dir);
+      passenger.car = committed;
+      return;
+    }
+
+    // Threshold: only hold back a fresh dispatch when all cars are busy —
+    // an idle car costs nothing to send even for a single passenger.
+    if (pickupThreshold > 0) {
+      const anyIdle = this.elevators.some((e) => e.isIdle);
+      if (!anyIdle) {
+        let n = 0;
+        for (const p of this.waiters[from]) if ((p.target - from) * dir > 0) n++;
+        if (n < pickupThreshold) {
+          passenger.car = null;
+          return;
+        }
+      }
+    }
+
     let best = 0;
     let bestCost = Infinity;
     for (let i = 0; i < this.M; i++) {
       const e = this.elevators[i];
       let cost;
-      if (e.isStopped && Math.round(e.pos) === from && e.dir === dir && e.cabin.length < this.config.capacity) {
+      if (e.isStopped && Math.round(e.pos) === from && e.dir === dir && e.cabin.length < capacity) {
         cost = 0; // already here with doors open
       } else if (e.isIdle) {
         cost = Math.abs(e.pos - from);
@@ -192,7 +221,7 @@ export class Simulation {
         }
       }
       cost += e.pickups.size * 0.2; // balance load
-      if (e.cabin.length >= this.config.capacity) cost += 10; // avoid full cars
+      if (e.cabin.length >= capacity) cost += 10; // avoid full cars
       if (cost < bestCost) {
         bestCost = cost;
         best = i;
@@ -244,29 +273,16 @@ export class Simulation {
     return up >= down ? 1 : -1;
   }
 
-  // Empty elevator with nothing to do: cruise toward the busiest floor so it is
-  // ready for the next wave. Movement is free — it does not commit a stop and
-  // may reverse/continue however the strategy chooses.
+  // Empty elevator with nothing to do: head to the busiest floor and serve it.
+  // Movement is free — it commits the pickup only at the destination and glides
+  // there without stopping at intermediate floors.
   idlePark(e) {
     if (this.totalWaiting === 0) return false;
     const target = this.busiestFloor();
-    e.parkTarget = target;
+    const dir = this.dominantDirection(target);
+    e.pickups.set(target, dir);
     e.dir = target > e.pos ? 1 : target < e.pos ? -1 : e.dir;
     return true;
-  }
-
-  // Move an idle car freely toward its park target, without stopping.
-  cruise(e, simDt) {
-    const target = e.parkTarget;
-    if (target == null) return;
-    if (target > e.pos + 1e-6) e.dir = 1;
-    else if (target < e.pos - 1e-6) e.dir = -1;
-    const prevPos = e.pos;
-    e.pos += e.dir * this.config.elevSpeed * simDt;
-    if (e.pos >= this.N - 1) { e.pos = this.N - 1; e.dir = -1; }
-    else if (e.pos <= 0) { e.pos = 0; e.dir = 1; }
-    // if we crossed the target, stop cruising
-    if ((target - prevPos) * (target - e.pos) <= 0) e.parkTarget = null;
   }
 
   hasStopAhead(e, dir) {
@@ -299,8 +315,7 @@ export class Simulation {
           return;
         }
       } else if (this.idlePark(e)) {
-        this.cruise(e, simDt);
-        return;
+        // committed a pickup at the busiest floor; move toward it next step
       } else {
         this.settle(e, simDt);
         return;
@@ -369,9 +384,19 @@ export class Simulation {
 
   advanceStop(e, simDt) {
     const f = Math.round(e.pos);
-    const { stopTime, boardTime } = this.config;
+    const { stopTime, boardTime, maxCollect } = this.config;
     e.stopTimer -= simDt;
     if (e.stopTimer > 0) return;
+
+    // While boarding, keep doors open to collect late arrivals up to maxCollect.
+    if (e.stopPhase === "enter" && maxCollect > 0) {
+      if (e._collect === undefined) e._collect = 0;
+      if (e._collect < maxCollect && this.boardOne(e, f)) {
+        e._collect++;
+        e.stopTimer = boardTime;
+        return;
+      }
+    }
 
     if (e.stopPhase === "open") {
       if (e.leaving.length > 0) {
@@ -380,6 +405,7 @@ export class Simulation {
       } else if (this.hasBoarding(e, f)) {
         e.stopPhase = "enter";
         e.stopTimer = boardTime;
+        e._collect = 0;
       } else {
         e.stopPhase = "close";
         e.stopTimer = stopTime / 2;
@@ -395,6 +421,7 @@ export class Simulation {
       } else if (this.hasBoarding(e, f)) {
         e.stopPhase = "enter";
         e.stopTimer = boardTime;
+        e._collect = 0;
       } else {
         e.stopPhase = "close";
         e.stopTimer = stopTime / 2;
@@ -410,6 +437,7 @@ export class Simulation {
     } else if (e.stopPhase === "close") {
       e.stopPhase = null;
       e.stopTimer = 0;
+      e._collect = 0;
     }
   }
 }

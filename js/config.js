@@ -22,4 +22,7 @@ export const DEFAULTS = {
   scenarioStory: 0,
   scenarioPeople: 100,
   seed: 1,
+  // Strategy tuning
+  pickupThreshold: 5, // only commit a pickup when >= this many wait (0 = off)
+  maxCollect: 12, // keep doors open to collect up to this many per stop
 };
