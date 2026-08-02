@@ -192,11 +192,21 @@ function stepOnce(simDt) {
     }
   }
 
+  const totalWaiting = waiters.reduce((a, q) => a + q.length, 0);
   for (const e of elevators) {
     if (e.stopTimer > 0) {
       e.stopTimer -= simDt;
       processStop(e, Math.round(e.pos));
       if (e.stopTimer <= 0) e.stopTimer = 0;
+      continue;
+    }
+    if (totalWaiting === 0 && e.cabin.length === 0) {
+      if (e.pos !== Math.round(e.pos)) {
+        const target = e.dir > 0 ? Math.ceil(e.pos) : Math.floor(e.pos);
+        e.pos += e.dir * ELEV_SPEED * simDt;
+        if (e.dir > 0) e.pos = Math.min(e.pos, target);
+        else e.pos = Math.max(e.pos, target);
+      }
       continue;
     }
     const prevPos = e.pos;
