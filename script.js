@@ -1,7 +1,8 @@
-const ELEV_SPEED = 2;
-const DOOR_TIME = 0.8;
+let ELEV_SPEED = 2;
+let STOP_TIME = 0.8;
+let BOARD_TIME = 0.1;
 
-let N = 6;
+let N = 3;
 let M = 2;
 let CAPACITY = 8;
 let SPEED = 2;
@@ -156,7 +157,13 @@ function processStop(e, f) {
 
 function stopAt(e, f) {
   e.pos = f;
-  e.stopTimer = DOOR_TIME;
+  const leaving = e.cabin.filter((p) => p.target === f).length;
+  const room = CAPACITY - (e.cabin.length - leaving);
+  let entering = 0;
+  for (const p of waiters[f]) {
+    if (entering < room && (p.target - f) * e.dir > 0) entering++;
+  }
+  e.stopTimer = STOP_TIME + (leaving + entering) * BOARD_TIME;
   processStop(e, f);
 }
 
@@ -391,6 +398,16 @@ function applyConfig() {
 ["n", "m", "cap"].forEach((id) => {
   $("#" + id).addEventListener("input", applyConfig);
   $("#" + id).addEventListener("change", applyConfig);
+});
+
+$("#elevSpeed").addEventListener("input", () => {
+  ELEV_SPEED = clamp(+$("#elevSpeed").value || 2, 0.1, 20);
+});
+$("#stopTime").addEventListener("input", () => {
+  STOP_TIME = clamp(+$("#stopTime").value || 0, 0, 10);
+});
+$("#boardTime").addEventListener("input", () => {
+  BOARD_TIME = clamp(+$("#boardTime").value || 0, 0, 5);
 });
 
 document.addEventListener(
