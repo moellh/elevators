@@ -29,19 +29,24 @@ function buildMatrix() {
   const table = $("#matrix");
   table.innerHTML = "";
   matrix = [];
-  const head = document.createElement("tr");
-  head.appendChild(document.createElement("th"));
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const corner = document.createElement("th");
+  corner.textContent = "from \\ to";
+  headRow.appendChild(corner);
   for (let to = 0; to < N; to++) {
     const th = document.createElement("th");
-    th.textContent = `to ${to}`;
-    head.appendChild(th);
+    th.textContent = to;
+    headRow.appendChild(th);
   }
+  head.appendChild(headRow);
   table.appendChild(head);
+  const body = document.createElement("tbody");
   for (let from = 0; from < N; from++) {
     matrix.push(new Array(N).fill(0));
     const tr = document.createElement("tr");
     const th = document.createElement("th");
-    th.textContent = `from ${from}`;
+    th.textContent = from;
     tr.appendChild(th);
     for (let to = 0; to < N; to++) {
       const td = document.createElement("td");
@@ -62,8 +67,9 @@ function buildMatrix() {
       td.appendChild(input);
       tr.appendChild(td);
     }
-    table.appendChild(tr);
+    body.appendChild(tr);
   }
+  table.appendChild(body);
 }
 
 function readMatrix() {
@@ -76,6 +82,8 @@ function readMatrix() {
 
 function buildBuilding() {
   const floorH = 60;
+  const root = document.documentElement;
+  root.style.setProperty("--fh", floorH + "px");
   const wrap = $("#building-wrap");
   const panel = $("#floor-panel");
   const shafts = $("#shafts");
@@ -87,7 +95,9 @@ function buildBuilding() {
     const row = document.createElement("div");
     row.className = "frow";
     row.style.height = `${floorH}px`;
-    row.innerHTML = `<span class="flabel">${f}</span><span class="fwait" id="fwait-${f}"></span>`;
+    row.innerHTML = `<span class="flabel">F${f}</span>
+      <span class="fchip up" id="fwup-${f}"></span>
+      <span class="fchip down" id="fwdown-${f}"></span>`;
     panel.appendChild(row);
   }
 
@@ -102,7 +112,12 @@ function buildBuilding() {
     car.className = "car";
     car.id = `car-${i}`;
     car.style.height = `${floorH * 0.7}px`;
-    car.innerHTML = `<div class="badge"><span id="dir-${i}"></span><span id="count-${i}"></span></div>`;
+    car.innerHTML = `<div class="door dl"></div><div class="door dr"></div>
+      <div class="car-hud">
+        <span class="car-arrow" id="dir-${i}"></span>
+        <span class="car-count" id="count-${i}"></span>
+        <div class="car-fill"><div class="car-fill-bar" id="fill-${i}"></div></div>
+      </div>`;
     shaft.appendChild(car);
     col.appendChild(shaft);
     const name = document.createElement("div");
@@ -246,14 +261,29 @@ function render() {
     const e = elevators[i];
     const car = $(`#car-${i}`);
     car.style.bottom = `${e.pos * floorH}px`;
-    $(`#dir-${i}`).textContent = e.dir > 0 ? "\u25b2" : "\u25bc";
+    car.classList.toggle("open", e.stopTimer > 0);
+    car.classList.toggle("car-idle", e.stopTimer === 0 && e.cabin.length === 0 && waiters.reduce((a, q) => a + q.length, 0) === 0);
+    const arrow = $(`#dir-${i}`);
+    arrow.textContent = e.dir > 0 ? "\u25b2" : "\u25bc";
+    arrow.className = `car-arrow ${e.dir > 0 ? "up" : "down"}`;
     $(`#count-${i}`).textContent = `${e.cabin.length}/${CAPACITY}`;
+    const fill = $(`#fill-${i}`);
+    fill.style.width = `${(e.cabin.length / CAPACITY) * 100}%`;
+    fill.classList.toggle("full", e.cabin.length >= CAPACITY);
   }
   for (let f = 0; f < N; f++) {
     const up = waiters[f].filter((p) => p.target > f).length;
     const down = waiters[f].filter((p) => p.target < f).length;
-    const el = $(`#fwait-${f}`);
-    if (el) el.textContent = `${up} \u25b2  \u25bc ${down}`;
+    const upEl = $(`#fwup-${f}`);
+    const downEl = $(`#fwdown-${f}`);
+    if (upEl) {
+      upEl.textContent = `\u25b2 ${up}`;
+      upEl.classList.toggle("has", up > 0);
+    }
+    if (downEl) {
+      downEl.textContent = `\u25bc ${down}`;
+      downEl.classList.toggle("has", down > 0);
+    }
   }
   const maxWait = waiters.reduce(
     (a, q) => q.reduce((m, p) => Math.max(m, simHours - p.arrived), a),
@@ -272,6 +302,69 @@ function render() {
   drawLine();
 }
 
+const CHART = {
+  bg: "rgba(255,255,255,0)",
+  grid: "rgba(154,164,178,0.10)",
+  axis: "rgba(154,164,178,0.45)",
+  text: "#9aa4b2",
+  label: "#6b7482",
+  histFill: "#4f9cf9",
+  histFillTop: "#8ec1ff",
+  line: "#e3b341",
+  areaTop: "rgba(227,179,65,0.22)",
+  areaBot: "rgba(227,179,65,0)",
+};
+
+function roundRect(ctx, x, y, w, h, r) {
+  if (h < 1) return;
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function niceTicks(max, n) {
+  const raw = max / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  const ticks = [];
+  for (let v = 0; v <= max + 1e-9; v += step) ticks.push(v);
+  if (ticks.length > 8) ticks.push(max);
+  return { ticks, step };
+}
+
+function drawGrid(ctx, W, H, padL, padB, padT, padR, xticks, yticks) {
+  ctx.strokeStyle = CHART.grid;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < xticks; i++) {
+    const x = padL + ((i + 0) / (xticks - 1)) * (W - padL - padR);
+    ctx.moveTo(x, padT);
+    ctx.lineTo(x, H - padB);
+  }
+  for (let i = 0; i < yticks; i++) {
+    const y = H - padB - (i / (yticks - 1)) * (H - padT - padB);
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+  }
+  ctx.stroke();
+}
+
+function drawAxes(ctx, W, H, padL, padB, padT, padR) {
+  ctx.strokeStyle = CHART.axis;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, H - padB);
+  ctx.lineTo(W - padR, H - padB);
+  ctx.stroke();
+}
+
 function drawHist() {
   const c = $("#hist");
   if (!c) return;
@@ -279,16 +372,24 @@ function drawHist() {
   const W = c.width;
   const H = c.height;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "#333";
-  ctx.font = "12px system-ui";
-  ctx.fillText("waiting times (histogram)", 10, 16);
+
+  const padL = 52;
+  const padR = 14;
+  const padT = 18;
+  const padB = 34;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
   if (durations.length === 0) {
-    ctx.fillStyle = "#999";
-    ctx.fillText("no completed trips yet", 10, 40);
+    ctx.fillStyle = CHART.text;
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("no completed trips yet", W / 2, H / 2);
     return;
   }
+
   const bins = 24;
-  const upper = Math.max(...durations) * 1.05;
+  const upper = Math.max(...durations) * 1.02 || 1;
   const counts = new Array(bins).fill(0);
   for (const d of durations) {
     let b = Math.floor((d / upper) * bins);
@@ -296,33 +397,47 @@ function drawHist() {
     counts[b]++;
   }
   const maxCount = Math.max(...counts);
-  const padL = 46;
-  const padB = 22;
-  const padT = 26;
-  const plotW = W - padL - 10;
-  const plotH = H - padT - padB;
-  ctx.strokeStyle = "#999";
-  ctx.beginPath();
-  ctx.moveTo(padL, padT);
-  ctx.lineTo(padL, H - padB);
-  ctx.lineTo(W - 10, H - padB);
-  ctx.stroke();
-  ctx.fillStyle = "#4a78b8";
+
+  const yT = niceTicks(maxCount, 4);
+  const yTicks = Math.min(6, yT.ticks.length);
+  const xTicks = 6;
+  drawGrid(ctx, W, H, padL, padB, padT, padR, xTicks, yTicks);
+
   const bw = plotW / bins;
   for (let b = 0; b < bins; b++) {
     const h = (counts[b] / maxCount) * plotH;
-    ctx.fillRect(padL + b * bw + 0.5, H - padB - h, bw - 1, h);
+    if (h < 1) continue;
+    const x = padL + b * bw;
+    const y = H - padB - h;
+    const grad = ctx.createLinearGradient(0, y, 0, H - padB);
+    grad.addColorStop(0, CHART.histFillTop);
+    grad.addColorStop(1, CHART.histFill);
+    ctx.fillStyle = grad;
+    roundRect(ctx, x + 1, y, bw - 2, h, 3);
+    ctx.fill();
   }
-  ctx.fillStyle = "#333";
-  ctx.font = "10px system-ui";
+
+  drawAxes(ctx, W, H, padL, padB, padT, padR);
+  ctx.fillStyle = CHART.text;
+  ctx.font = "11px system-ui";
   ctx.textAlign = "right";
-  for (let i = 0; i <= 4; i++) {
-    const val = (upper * (i / 4)).toFixed(2);
-    const y = H - padB - (i / 4) * plotH;
-    ctx.fillText(val, padL - 4, y + 3);
-  }
+  yT.ticks.slice(0, yTicks).forEach((v, i) => {
+    const y = H - padB - (i / (yTicks - 1)) * plotH;
+    ctx.fillText(v, padL - 6, y + 3);
+  });
+  ctx.fillStyle = CHART.label;
+  ctx.textAlign = "left";
+  ctx.font = "11px system-ui";
+  ctx.fillText("trips", 4, padT);
   ctx.textAlign = "center";
-  ctx.fillText("duration (h)", W / 2, H - 6);
+  ctx.fillStyle = CHART.text;
+  for (let i = 0; i < xTicks; i++) {
+    const v = (upper * (i / (xTicks - 1))).toFixed(2);
+    const x = padL + (i / (xTicks - 1)) * plotW;
+    ctx.fillText(v, x, H - 12);
+  }
+  ctx.fillStyle = CHART.label;
+  ctx.fillText("duration (h)", padL + plotW / 2, H - 4);
 }
 
 function drawLine() {
@@ -332,48 +447,78 @@ function drawLine() {
   const W = c.width;
   const H = c.height;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "#333";
-  ctx.font = "12px system-ui";
-  ctx.fillText("max duration over time", 10, 16);
+
+  const padL = 52;
+  const padR = 14;
+  const padT = 18;
+  const padB = 34;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
   if (series.length < 2) {
-    ctx.fillStyle = "#999";
-    ctx.fillText("not enough data yet", 10, 40);
+    ctx.fillStyle = CHART.text;
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("not enough data yet", W / 2, H / 2);
     return;
   }
-  const padL = 46;
-  const padB = 22;
-  const padT = 26;
-  const plotW = W - padL - 10;
-  const plotH = H - padT - padB;
-  const tMax = series[series.length - 1].t;
-  const yMax = Math.max(...series.map((s) => s.max)) * 1.05;
-  ctx.strokeStyle = "#999";
+
+  const tMax = series[series.length - 1].t || 1;
+  const yMax = Math.max(...series.map((s) => s.max)) * 1.02 || 1;
+  const yT = niceTicks(yMax, 4);
+  const yTicks = Math.min(6, yT.ticks.length);
+  const xTicks = 6;
+  drawGrid(ctx, W, H, padL, padB, padT, padR, xTicks, yTicks);
+
+  const pts = series.map((s) => ({
+    x: padL + (s.t / tMax) * plotW,
+    y: H - padB - (s.max / yMax) * plotH,
+  }));
+
+  const area = ctx.createLinearGradient(0, padT, 0, H - padB);
+  area.addColorStop(0, CHART.areaTop);
+  area.addColorStop(1, CHART.areaBot);
   ctx.beginPath();
-  ctx.moveTo(padL, padT);
-  ctx.lineTo(padL, H - padB);
-  ctx.lineTo(W - 10, H - padB);
-  ctx.stroke();
-  ctx.strokeStyle = "#d04848";
+  pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.lineTo(pts[pts.length - 1].x, H - padB);
+  ctx.lineTo(pts[0].x, H - padB);
+  ctx.closePath();
+  ctx.fillStyle = area;
+  ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.strokeStyle = CHART.line;
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  series.forEach((s, i) => {
-    const x = padL + (s.t / tMax) * plotW;
-    const y = H - padB - (s.max / yMax) * plotH;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
   ctx.stroke();
-  ctx.lineWidth = 1;
-  ctx.fillStyle = "#333";
-  ctx.font = "10px system-ui";
+
+  ctx.fillStyle = CHART.line;
+  ctx.beginPath();
+  ctx.arc(pts[pts.length - 1].x, pts[pts.length - 1].y, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawAxes(ctx, W, H, padL, padB, padT, padR);
+  ctx.fillStyle = CHART.text;
+  ctx.font = "11px system-ui";
   ctx.textAlign = "right";
-  for (let i = 0; i <= 4; i++) {
-    const val = (yMax * (i / 4)).toFixed(2);
-    const y = H - padB - (i / 4) * plotH;
-    ctx.fillText(val, padL - 4, y + 3);
-  }
+  yT.ticks.slice(0, yTicks).forEach((v, i) => {
+    const y = H - padB - (i / (yTicks - 1)) * plotH;
+    ctx.fillText(v.toFixed(2), padL - 6, y + 3);
+  });
+  ctx.fillStyle = CHART.label;
+  ctx.textAlign = "left";
+  ctx.fillText("max wait (h)", 4, padT);
   ctx.textAlign = "center";
-  ctx.fillText("time (h)", W / 2, H - 6);
+  ctx.fillStyle = CHART.text;
+  for (let i = 0; i < xTicks; i++) {
+    const v = (tMax * (i / (xTicks - 1))).toFixed(2);
+    const x = padL + (i / (xTicks - 1)) * plotW;
+    ctx.fillText(v, x, H - 12);
+  }
+  ctx.fillStyle = CHART.label;
+  ctx.fillText("time (h)", padL + plotW / 2, H - 4);
 }
 
 let running = false;

@@ -7,39 +7,80 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <h1>Elevator Simulator</h1>
+    <header class="topbar">
+      <h1>Elevator Simulator</h1>
+      <div class="controls">
+        <div class="control">
+          <label for="n">Stories</label>
+          <input id="n" type="number" min="2" max="20" value="3" />
+        </div>
+        <div class="control">
+          <label for="m">Elevators</label>
+          <input id="m" type="number" min="1" max="8" value="2" />
+        </div>
+        <div class="control">
+          <label for="cap">Capacity</label>
+          <input id="cap" type="number" min="1" max="30" value="8" />
+        </div>
+        <div class="control">
+          <label for="elevSpeed">Elev speed</label>
+          <input id="elevSpeed" type="number" min="0.1" max="20" step="0.1" value="2" />
+        </div>
+        <div class="control">
+          <label for="stopTime">Stop time</label>
+          <input id="stopTime" type="number" min="0" max="10" step="0.1" value="0.8" />
+        </div>
+        <div class="control">
+          <label for="boardTime">Board time</label>
+          <input id="boardTime" type="number" min="0" max="5" step="0.1" value="0.1" />
+        </div>
+        <div class="control">
+          <label for="speed">Speed</label>
+          <input id="speed" type="number" min="1" max="120" step="1" value="2" />
+        </div>
+        <div class="btn-group">
+          <button id="toggle" class="btn primary">Start</button>
+          <button id="reset" class="btn">Reset</button>
+          <button id="randomize" class="btn">Randomize</button>
+        </div>
+      </div>
+    </header>
 
-    <section id="config">
-      <label>Stories <input id="n" type="number" min="2" max="20" value="3" /></label>
-      <label>Elevators <input id="m" type="number" min="1" max="8" value="2" /></label>
-      <label>Capacity <input id="cap" type="number" min="1" max="30" value="8" /></label>
-      <label>Elev speed <input id="elevSpeed" type="number" min="0.1" max="20" step="0.1" value="2" /></label>
-      <label>Stop time <input id="stopTime" type="number" min="0" max="10" step="0.1" value="0.8" /></label>
-      <label>Board time <input id="boardTime" type="number" min="0" max="5" step="0.1" value="0.1" /></label>
-      <label>Speed <input id="speed" type="number" min="1" max="120" step="1" value="2" /></label>
-      <button id="randomize">Randomize</button>
-      <button id="toggle">Pause</button>
-      <button id="reset">Reset</button>
-    </section>
+    <main>
+      <section class="stats" aria-label="Simulation statistics">
+        <div class="stat"><span class="stat-label">Time</span><span class="stat-value" id="statTime">0.00</span><span class="stat-unit">h</span></div>
+        <div class="stat"><span class="stat-label">Served</span><span class="stat-value" id="statServed">0</span></div>
+        <div class="stat"><span class="stat-label">Waiting</span><span class="stat-value" id="statWaiting">0</span></div>
+        <div class="stat"><span class="stat-label">Longest wait</span><span class="stat-value" id="statMaxWait">0.00</span><span class="stat-unit">h</span></div>
+        <div class="stat"><span class="stat-label">Trips</span><span class="stat-value" id="statTrips">0</span></div>
+      </section>
 
-    <div id="stats">
-      Time: <span id="statTime">0.00</span> h &middot; Served: <span id="statServed">0</span> &middot; Waiting: <span id="statWaiting">0</span> &middot; Longest wait: <span id="statMaxWait">0.00</span> h &middot; Trips: <span id="statTrips">0</span>
-    </div>
+      <div class="grid">
+        <section class="card building-card">
+          <div class="card-head"><h2>Building</h2></div>
+          <div id="building-wrap">
+            <div id="floor-panel"></div>
+            <div id="shafts"></div>
+          </div>
+        </section>
 
-    <section id="matrix-wrap">
-      <h2>People per hour (from &rarr; to)</h2>
-      <table id="matrix"></table>
-    </section>
+        <section class="card matrix-card">
+          <div class="card-head"><h2>Traffic</h2><span class="card-sub">people / hour</span></div>
+          <table id="matrix"></table>
+        </section>
+      </div>
 
-    <section id="building-wrap">
-      <div id="floor-panel"></div>
-      <div id="shafts"></div>
-    </section>
-
-    <section id="charts">
-      <canvas id="hist" width="560" height="180"></canvas>
-      <canvas id="line" width="560" height="180"></canvas>
-    </section>
+      <div class="grid charts-grid">
+        <section class="card">
+          <div class="card-head"><h2>Waiting times</h2><span class="card-sub">histogram</span></div>
+          <canvas id="hist" width="560" height="240"></canvas>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Worst wait</h2><span class="card-sub">over time</span></div>
+          <canvas id="line" width="560" height="240"></canvas>
+        </section>
+      </div>
+    </main>
 
     <script src="script.js"></script>
   </body>
