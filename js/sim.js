@@ -5,6 +5,7 @@ export class Passenger {
   constructor(target, arrived) {
     this.target = target;
     this.arrived = arrived;
+    this.car = null;
   }
 }
 
@@ -16,6 +17,7 @@ export class Elevator {
     this.stopPhase = null; // null | "open" | "leave" | "enter" | "close"
     this.stopTimer = 0;
     this.leaving = [];
+    this.pickups = new Map(); // floor -> direction (1 | -1)
   }
 
   get isStopped() {
@@ -23,7 +25,15 @@ export class Elevator {
   }
 
   get isIdle() {
-    return this.stopPhase === null && this.cabin.length === 0;
+    return this.stopPhase === null && this.cabin.length === 0 && this.pickups.size === 0;
+  }
+
+  // All floors this elevator must stop at: dropoffs of onboard passengers
+  // plus floors it is committed to pick up from.
+  get stopFloors() {
+    const stops = new Set(this.cabin.map((p) => p.target));
+    for (const f of this.pickups.keys()) stops.add(f);
+    return stops;
   }
 }
 
@@ -36,7 +46,6 @@ export class Simulation {
     this.delivered = 0;
     this.simHours = 0;
     this.durations = [];
-    this.maxDur = 0;
     this.series = [];
     this.lastSample = 0;
     this.resize();
@@ -74,7 +83,6 @@ export class Simulation {
     this.delivered = 0;
     this.simHours = 0;
     this.durations = [];
-    this.maxDur = 0;
     this.series = [];
     this.lastSample = 0;
   }
@@ -92,7 +100,8 @@ export class Simulation {
     this.reset();
   }
 
-  step(realDt) {    const { speed, elevSpeed } = this.config;
+  step(realDt) {
+    const { speed, elevSpeed } = this.config;
     const h = Math.min(0.1, MAX_MOVE / elevSpeed);
     let remaining = realDt * speed;
     while (remaining > 1e-9) {
@@ -102,7 +111,11 @@ export class Simulation {
     }
     this.simHours += (realDt * speed) / SECONDS_PER_HOUR;
     if (this.simHours - this.lastSample >= 0.02) {
-      this.series.push({ t: this.simHours, max: this.maxDur });
+      const window = this.durations.slice(-100);
+      this.series.push({
+        t: this.simHours,
+        max: window.length ? Math.max(...window) : 0,
+      });
       this.lastSample = this.simHours;
     }
   }
@@ -112,8 +125,6 @@ export class Simulation {
     for (const e of this.elevators) {
       if (e.isStopped) {
         this.advanceStop(e, simDt);
-      } else if (this.totalWaiting === 0 && e.cabin.length === 0) {
-        this.settle(e, simDt);
       } else {
         this.move(e, simDt);
       }
@@ -128,9 +139,52 @@ export class Simulation {
         const p = expected - Math.floor(expected);
         const n = Math.floor(expected) + (Math.random() < p ? 1 : 0);
         for (let k = 0; k < n; k++) {
-          this.waiters[from].push(new Passenger(to, this.simHours));
+          const passenger = new Passenger(to, this.simHours);
+          this.waiters[from].push(passenger);
+          this.dispatch(passenger, from);
         }
       }
+    }
+  }
+
+  // Assign a fresh request to the elevator that can serve it soonest.
+  dispatch(passenger, from) {
+    const dir = Math.sign(passenger.target - from);
+    let best = 0;
+    let bestCost = Infinity;
+    for (let i = 0; i < this.M; i++) {
+      const e = this.elevators[i];
+      let cost;
+      if (e.isStopped && Math.round(e.pos) === from && e.dir === dir && e.cabin.length < this.config.capacity) {
+        cost = 0; // already here with doors open
+      } else if (e.isIdle) {
+        cost = Math.abs(e.pos - from);
+      } else {
+        const onTheWay =
+          e.dir === dir &&
+          ((dir > 0 && from >= e.pos) || (dir < 0 && from <= e.pos));
+        if (onTheWay) {
+          cost = Math.abs(e.pos - from);
+        } else {
+          const end = e.dir > 0 ? this.N - 1 : 0;
+          cost = Math.abs(e.pos - end) + Math.abs(end - from);
+        }
+      }
+      cost += e.pickups.size * 0.2; // balance load
+      if (e.cabin.length >= this.config.capacity) cost += 10; // avoid full cars
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = i;
+      }
+    }
+    this.elevators[best].pickups.set(from, dir);
+    passenger.car = best;
+  }
+
+  // Remove an assigned pickup (floor+dir) from every elevator once it is served.
+  clearPickup(f, dir) {
+    for (const e of this.elevators) {
+      if (e.pickups.get(f) === dir) e.pickups.delete(f);
     }
   }
 
@@ -143,12 +197,78 @@ export class Simulation {
     }
   }
 
+  // Busiest floor by number of waiting people; ties go to the lowest floor.
+  busiestFloor() {
+    let best = 0;
+    let bestCount = -1;
+    for (let f = 0; f < this.N; f++) {
+      const n = this.waiters[f].length;
+      if (n > bestCount) {
+        bestCount = n;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  dominantDirection(f) {
+    let up = 0;
+    let down = 0;
+    for (const p of this.waiters[f]) {
+      if (p.target > f) up++;
+      else if (p.target < f) down++;
+    }
+    return up >= down ? 1 : -1;
+  }
+
+  // Empty elevator with nothing to do: park at the busiest floor so it is
+  // ready for the next wave of passengers.
+  idlePark(e) {
+    if (this.totalWaiting === 0) return false;
+    const target = this.busiestFloor();
+    const dir = this.dominantDirection(target);
+    e.pickups.set(target, dir);
+    e.dir = dir;
+    return true;
+  }
+
+  hasStopAhead(e, dir) {
+    for (const s of e.stopFloors) {
+      if (dir > 0 ? s > e.pos + 1e-6 : s < e.pos - 1e-6) return true;
+    }
+    return false;
+  }
+
+  hasStopBehind(e, dir) {
+    for (const s of e.stopFloors) {
+      if (dir > 0 ? s < e.pos - 1e-6 : s > e.pos + 1e-6) return true;
+    }
+    return false;
+  }
+
   move(e, simDt) {
     const here = Math.round(e.pos);
     if (Math.abs(e.pos - here) < 1e-6 && this.shouldStop(e, here)) {
       this.stopAt(e, here);
       return;
     }
+
+    // Reverse when nothing is left ahead, unless fully idle.
+    if (!this.hasStopAhead(e, e.dir)) {
+      if (this.hasStopBehind(e, e.dir) || e.pickups.size > 0 || e.cabin.length > 0) {
+        e.dir = -e.dir;
+        if (Math.abs(e.pos - Math.round(e.pos)) < 1e-6 && this.shouldStop(e, Math.round(e.pos))) {
+          this.stopAt(e, Math.round(e.pos));
+          return;
+        }
+      } else if (this.idlePark(e)) {
+        // will move next step toward the parked floor
+      } else {
+        this.settle(e, simDt);
+        return;
+      }
+    }
+
     const prevPos = e.pos;
     e.pos += e.dir * this.config.elevSpeed * simDt;
     if (e.pos >= this.N - 1) {
@@ -178,7 +298,8 @@ export class Simulation {
   shouldStop(e, f) {
     if (e.cabin.some((p) => p.target === f)) return true;
     if (e.cabin.length >= this.config.capacity) return false;
-    return this.waiters[f].some((p) => (p.target - f) * e.dir > 0);
+    if (e.pickups.get(f) === e.dir) return true;
+    return false;
   }
 
   stopAt(e, f) {
@@ -197,6 +318,7 @@ export class Simulation {
     const idx = this.waiters[f].findIndex((p) => (p.target - f) * e.dir > 0);
     if (idx === -1) return false;
     e.cabin.push(this.waiters[f].splice(idx, 1)[0]);
+    this.clearPickup(f, e.dir);
     return true;
   }
 
@@ -223,7 +345,6 @@ export class Simulation {
       this.delivered++;
       const dur = this.simHours - p.arrived;
       this.durations.push(dur);
-      if (dur > this.maxDur) this.maxDur = dur;
       if (e.leaving.length > 0) {
         e.stopTimer = boardTime;
       } else if (this.hasBoarding(e, f)) {
