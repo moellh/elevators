@@ -19,6 +19,7 @@ const els = {
   reset: $("#reset"),
   scenario1toN: $("#scenario1toN"),
   scenarioNto1: $("#scenarioNto1"),
+  scenarioEqual: $("#scenarioEqual"),
   statTime: $("#statTime"),
   statServed: $("#statServed"),
   statWaiting: $("#statWaiting"),
@@ -101,6 +102,10 @@ els.scenario1toN.addEventListener("click", () => {
 
 els.scenarioNto1.addEventListener("click", () => {
   sim.applyScenario("in", +els.scenarioStory.value, +els.scenarioPeople.value);
+});
+
+els.scenarioEqual.addEventListener("click", () => {
+  sim.applyScenario("equal", +els.scenarioStory.value, +els.scenarioPeople.value);
 });
 
 for (const id of ["scenarioStory", "scenarioPeople"]) {

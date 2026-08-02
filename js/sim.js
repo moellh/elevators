@@ -93,8 +93,12 @@ export class Simulation {
     for (let a = 0; a < this.N; a++) {
       for (let b = 0; b < this.N; b++) {
         if (a === b) continue;
-        const hot = kind === "in" ? b === story : a === story;
-        this.matrix[a][b] = hot ? people : base;
+        if (kind === "equal") {
+          this.matrix[a][b] = people;
+        } else {
+          const hot = kind === "in" ? b === story : a === story;
+          this.matrix[a][b] = hot ? people : base;
+        }
       }
     }
     this.reset();
