@@ -1,5 +1,5 @@
-let ELEV_SPEED = 1.5;
-let STOP_TIME = 5;
+let ELEV_SPEED = 1;
+let STOP_TIME = 10;
 let BOARD_TIME = 1.5;
 
 let N = 6;
@@ -116,27 +116,31 @@ function shouldStop(e, f) {
 function stopAt(e, f) {
   e.pos = f;
   e.leaving = e.cabin.filter((p) => p.target === f);
-  const room = CAPACITY - (e.cabin.length - e.leaving.length);
-  e.entering = [];
-  for (const p of waiters[f]) {
-    if (e.entering.length < room && (p.target - f) * e.dir > 0) {
-      e.entering.push(p);
-    }
-  }
-  const enteringSet = new Set(e.entering);
-  waiters[f] = waiters[f].filter((p) => !enteringSet.has(p));
   e.stopPhase = "open";
   e.stopTimer = STOP_TIME / 2;
 }
 
+function hasBoarding(e, f) {
+  if (e.cabin.length >= CAPACITY) return false;
+  return waiters[f].some((p) => (p.target - f) * e.dir > 0);
+}
+
+function boardOne(e, f) {
+  const idx = waiters[f].findIndex((p) => (p.target - f) * e.dir > 0);
+  if (idx === -1) return false;
+  e.cabin.push(waiters[f].splice(idx, 1)[0]);
+  return true;
+}
+
 function advanceStop(e, simDt) {
+  const f = Math.round(e.pos);
   e.stopTimer -= simDt;
   if (e.stopTimer > 0) return;
   if (e.stopPhase === "open") {
     if (e.leaving.length > 0) {
       e.stopPhase = "leave";
       e.stopTimer = BOARD_TIME;
-    } else if (e.entering.length > 0) {
+    } else if (hasBoarding(e, f)) {
       e.stopPhase = "enter";
       e.stopTimer = BOARD_TIME;
     } else {
@@ -152,7 +156,7 @@ function advanceStop(e, simDt) {
     if (dur > maxDur) maxDur = dur;
     if (e.leaving.length > 0) {
       e.stopTimer = BOARD_TIME;
-    } else if (e.entering.length > 0) {
+    } else if (hasBoarding(e, f)) {
       e.stopPhase = "enter";
       e.stopTimer = BOARD_TIME;
     } else {
@@ -160,9 +164,13 @@ function advanceStop(e, simDt) {
       e.stopTimer = STOP_TIME / 2;
     }
   } else if (e.stopPhase === "enter") {
-    e.cabin.push(e.entering.pop());
-    if (e.entering.length > 0) {
-      e.stopTimer = BOARD_TIME;
+    if (boardOne(e, f)) {
+      if (hasBoarding(e, f)) {
+        e.stopTimer = BOARD_TIME;
+      } else {
+        e.stopPhase = "close";
+        e.stopTimer = STOP_TIME / 2;
+      }
     } else {
       e.stopPhase = "close";
       e.stopTimer = STOP_TIME / 2;
@@ -212,6 +220,11 @@ function stepOnce(simDt) {
         if (e.dir > 0) e.pos = Math.min(e.pos, target);
         else e.pos = Math.max(e.pos, target);
       }
+      continue;
+    }
+    const here = Math.round(e.pos);
+    if (Math.abs(e.pos - here) < 1e-6 && shouldStop(e, here)) {
+      stopAt(e, here);
       continue;
     }
     const prevPos = e.pos;
@@ -378,10 +391,10 @@ function drawHist() {
   }
 
   const bins = 24;
-  const upper = Math.max(...durations) * 1.02 || 1;
+  const upper = Math.max(...durations) * 60 * 1.02 || 1;
   const counts = new Array(bins).fill(0);
   for (const d of durations) {
-    let b = Math.floor((d / upper) * bins);
+    let b = Math.floor(((d * 60) / upper) * bins);
     if (b >= bins) b = bins - 1;
     counts[b]++;
   }
@@ -426,7 +439,7 @@ function drawHist() {
     ctx.fillText(v, x, H - 12);
   }
   ctx.fillStyle = CHART.label;
-  ctx.fillText("duration (h)", padL + plotW / 2, H - 4);
+  ctx.fillText("duration (min)", padL + plotW / 2, H - 4);
 }
 
 function drawLine() {
@@ -631,8 +644,8 @@ function loadState() {
     M = clamp(Math.round(+s.M) || 2, 1, 8);
     CAPACITY = clamp(Math.round(+s.CAPACITY) || 8, 1, 30);
     SPEED = Math.max(1, +s.SPEED || 1);
-    ELEV_SPEED = clamp(+s.ELEV_SPEED || 1.5, 0.1, 20);
-    STOP_TIME = clamp(+s.STOP_TIME ?? 5, 0, 10);
+    ELEV_SPEED = clamp(+s.ELEV_SPEED || 1, 0.1, 20);
+    STOP_TIME = clamp(+s.STOP_TIME ?? 10, 0, 10);
     BOARD_TIME = clamp(+s.BOARD_TIME ?? 1.5, 0, 5);
     if (Array.isArray(s.matrix) && s.matrix.length === N) {
       matrix = s.matrix.map((row) => row.slice());
@@ -653,8 +666,8 @@ function loadState() {
 }
 
 $("#speed").addEventListener("input", () => {
-  SPEED = Math.max(1, +$("#speed").value || 1);
-  saveState();
+  SPEED = Math.max(1, Math.round(+$("#speed").value) || 1);
+  $("#speed").value = SPEED;
 });
 
 const loaded = loadState();
