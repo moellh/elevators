@@ -265,8 +265,9 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1px;
+  gap: 0;
   padding-right: 12px;
+  overflow: hidden;
 }
 
 .frow:last-child {
@@ -278,12 +279,13 @@ main {
   font-weight: 500;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .fchip {
   font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .fchip.up {
@@ -310,10 +312,12 @@ main {
   flex-direction: column;
   flex: 1;
   max-width: 90px;
+  flex-shrink: 0;
 }
 
 .shaft {
   position: relative;
+  flex-shrink: 0;
   background-image: linear-gradient(to top, transparent calc(100% - 1px), var(--line) 1px);
   background-size: 100% var(--pitch);
   border-left: 1px solid var(--gray-5);

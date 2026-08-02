@@ -60,17 +60,16 @@ function buildBuilding() {
     row.className = "frow";
     row.style.height = `${carH}px`;
     row.style.marginBottom = f > 0 ? `${gap}px` : "0";
-    const chips = [];
-    if (f < N - 1) chips.push(`<span class="fchip up" id="fwup-${f}"></span>`);
-    if (f > 0) chips.push(`<span class="fchip down" id="fwdown-${f}"></span>`);
-    row.innerHTML = `<span class="flabel">F${f}</span>${chips.join("")}`;
+    row.style.borderBottom = f > 0 ? `1px solid var(--line)` : "none";
+    row.innerHTML = `<span class="flabel">F${f}</span>
+      <span class="fchip up" id="fwup-${f}"></span>
+      <span class="fchip down" id="fwdown-${f}"></span>`;
     panel.appendChild(row);
   }
 
   for (let i = 0; i < M; i++) {
     const col = document.createElement("div");
     col.className = "shaft-col";
-    col.style.height = `${totalH}px`;
     const shaft = document.createElement("div");
     shaft.className = "shaft";
     shaft.style.height = `${totalH}px`;
@@ -267,12 +266,12 @@ function render() {
     const upEl = $(`#fwup-${f}`);
     const downEl = $(`#fwdown-${f}`);
     if (upEl) {
-      upEl.textContent = `\u25b2 ${up}`;
-      upEl.classList.toggle("has", up > 0);
+      upEl.textContent = f < N - 1 ? `\u25b2 ${up}` : "";
+      upEl.classList.toggle("has", f < N - 1 && up > 0);
     }
     if (downEl) {
-      downEl.textContent = `\u25bc ${down}`;
-      downEl.classList.toggle("has", down > 0);
+      downEl.textContent = f > 0 ? `\u25bc ${down}` : "";
+      downEl.classList.toggle("has", f > 0 && down > 0);
     }
   }
   const maxWait = waiters.reduce(
