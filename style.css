@@ -225,60 +225,20 @@ main {
   color: var(--gray-3);
 }
 
-/* ---------- matrix ---------- */
+/* ---------- scenarios ---------- */
 
-.matrix-card {
-  overflow-x: auto;
+.scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  margin-bottom: 4px;
 }
 
-table#matrix {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-table#matrix th,
-table#matrix td {
-  padding: 3px;
-  text-align: center;
-}
-
-table#matrix thead th {
-  font-size: 13px;
-  color: var(--gray-3);
-  font-weight: 500;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--gray-4);
-}
-
-table#matrix tbody td:first-child,
-table#matrix thead th:first-child {
-  font-size: 13px;
-  color: var(--gray-3);
-  font-weight: 500;
-}
-
-table#matrix input {
-  width: 100%;
-  min-width: 48px;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--line);
-  color: var(--fg);
-  font-family: var(--mono);
-  font-size: 13px;
-  padding: 2px 2px 4px;
-  border-radius: 0;
-  text-align: center;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-table#matrix input:focus {
-  border-bottom-color: var(--gray-2);
-}
-
-table#matrix td.diag {
-  border-bottom: 1px dashed var(--gray-5);
+.scenarios .control input {
+  width: 90px;
 }
 
 /* ---------- building ---------- */

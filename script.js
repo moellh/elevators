@@ -25,60 +25,19 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function buildMatrix() {
-  const table = $("#matrix");
-  table.innerHTML = "";
+function initMatrix() {
   matrix = [];
-  const head = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  const corner = document.createElement("th");
-  corner.textContent = "from \\ to";
-  headRow.appendChild(corner);
-  for (let to = 0; to < N; to++) {
-    const th = document.createElement("th");
-    th.textContent = to;
-    headRow.appendChild(th);
-  }
-  head.appendChild(headRow);
-  table.appendChild(head);
-  const body = document.createElement("tbody");
   for (let from = 0; from < N; from++) {
     matrix.push(new Array(N).fill(0));
-    const tr = document.createElement("tr");
-    const th = document.createElement("th");
-    th.textContent = from;
-    tr.appendChild(th);
-    for (let to = 0; to < N; to++) {
-      const td = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "number";
-      input.min = 0;
-      input.value = 0;
-      input.dataset.from = from;
-      input.dataset.to = to;
-      if (from === to) {
-        input.disabled = true;
-        input.value = "";
-        td.classList.add("diag");
-      } else {
-        input.value = 30;
-        matrix[from][to] = 30;
-      }
-      td.appendChild(input);
-      tr.appendChild(td);
-    }
-    body.appendChild(tr);
   }
-  table.appendChild(body);
 }
 
-function readMatrix() {
-  document.querySelectorAll("#matrix input:not(:disabled)").forEach((inp) => {
-    const from = +inp.dataset.from;
-    const to = +inp.dataset.to;
-    matrix[from][to] = Math.max(0, +inp.value || 0);
-  });
+function setMatrix(from, to, v) {
+  if (from < 0 || from >= N || to < 0 || to >= N) return;
+  if (from !== to) matrix[from][to] = v;
 }
+
+function buildMatrix() {}
 
 function buildBuilding() {
   const carH = 48;
@@ -550,7 +509,9 @@ function applyConfig() {
     N = newN;
     M = newM;
     CAPACITY = newCap;
-    buildMatrix();
+    initMatrix();
+    $("#scenarioStory").max = N - 1;
+    if (+$("#scenarioStory").value > N - 1) $("#scenarioStory").value = 0;
     buildBuilding();
     resetSim();
     saveState();
@@ -590,16 +551,29 @@ document.addEventListener(
   { passive: false }
 );
 
-document.addEventListener(
-  "input",
-  (e) => {
-    if (e.target.matches && e.target.matches("#matrix input:not(:disabled)")) {
-      readMatrix();
-      saveState();
+function applyScenario(from, to) {
+  const story = clamp(Math.round(+$("#scenarioStory").value) || 0, 0, N - 1);
+  const people = Math.max(0, +$("#scenarioPeople").value || 0);
+  const base = Math.round(people * 0.01);
+  initMatrix();
+  for (let a = 0; a < N; a++) {
+    for (let b = 0; b < N; b++) {
+      if (a === b) continue;
+      const hot = from === -1 ? b === story : a === story;
+      setMatrix(a, b, hot ? people : base);
     }
-  },
-  { passive: true }
-);
+  }
+  resetSim();
+  saveState();
+}
+
+$("#scenario1toN").addEventListener("click", () => {
+  applyScenario(0, -1);
+});
+
+$("#scenarioNto1").addEventListener("click", () => {
+  applyScenario(-1, 0);
+});
 
 $("#toggle").addEventListener("click", () => {
   running = !running;
@@ -615,7 +589,11 @@ const STORAGE_KEY = "elevator-sim";
 
 function saveState() {
   try {
-    const state = { N, M, CAPACITY, SPEED, ELEV_SPEED, STOP_TIME, BOARD_TIME, matrix };
+    const state = {
+      N, M, CAPACITY, SPEED, ELEV_SPEED, STOP_TIME, BOARD_TIME, matrix,
+      scenarioStory: +$("#scenarioStory").value,
+      scenarioPeople: +$("#scenarioPeople").value,
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {}
 }
@@ -635,6 +613,8 @@ function loadState() {
     if (Array.isArray(s.matrix) && s.matrix.length === N) {
       matrix = s.matrix.map((row) => row.slice());
     }
+    if (s.scenarioStory !== undefined) $("#scenarioStory").value = s.scenarioStory;
+    if (s.scenarioPeople !== undefined) $("#scenarioPeople").value = s.scenarioPeople;
     $("#n").value = N;
     $("#m").value = M;
     $("#cap").value = CAPACITY;
@@ -654,14 +634,9 @@ $("#speed").addEventListener("input", () => {
 });
 
 const loaded = loadState();
-const savedMatrix = loaded && Array.isArray(matrix) ? matrix.map((r) => r.slice()) : null;
-buildMatrix();
-if (savedMatrix && savedMatrix.length === N) {
-  document.querySelectorAll("#matrix input:not(:disabled)").forEach((inp) => {
-    const v = savedMatrix[+inp.dataset.from][+inp.dataset.to];
-    if (v !== undefined) inp.value = v;
-  });
-  readMatrix();
+if (matrix.length === 0) {
+  initMatrix();
+  applyScenario(0, -1);
 }
 buildBuilding();
 resetSim();
