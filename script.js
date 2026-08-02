@@ -97,7 +97,7 @@ function resetSim() {
   waiters = Array.from({ length: N }, () => []);
   elevators = [];
   for (let i = 0; i < M; i++) {
-    elevators.push({ pos: 0, dir: 1, cabin: [], stopTimer: 0 });
+    elevators.push({ pos: 0, dir: 1, cabin: [], stopPhase: null, stopTimer: 0, leaving: [], entering: [] });
   }
   served = 0;
   delivered = 0;
@@ -114,37 +114,64 @@ function shouldStop(e, f) {
   return waiters[f].some((p) => (p.target - f) * e.dir > 0);
 }
 
-function processStop(e, f) {
-  const leaving = e.cabin.filter((p) => p.target === f);
-  e.cabin = e.cabin.filter((p) => p.target !== f);
-  delivered += leaving.length;
-  for (const p of leaving) {
+function stopAt(e, f) {
+  e.pos = f;
+  e.leaving = e.cabin.filter((p) => p.target === f);
+  const room = CAPACITY - (e.cabin.length - e.leaving.length);
+  e.entering = [];
+  for (const p of waiters[f]) {
+    if (e.entering.length < room && (p.target - f) * e.dir > 0) {
+      e.entering.push(p);
+    }
+  }
+  const enteringSet = new Set(e.entering);
+  waiters[f] = waiters[f].filter((p) => !enteringSet.has(p));
+  e.stopPhase = "open";
+  e.stopTimer = STOP_TIME / 2;
+}
+
+function advanceStop(e, simDt) {
+  e.stopTimer -= simDt;
+  if (e.stopTimer > 0) return;
+  if (e.stopPhase === "open") {
+    if (e.leaving.length > 0) {
+      e.stopPhase = "leave";
+      e.stopTimer = BOARD_TIME;
+    } else if (e.entering.length > 0) {
+      e.stopPhase = "enter";
+      e.stopTimer = BOARD_TIME;
+    } else {
+      e.stopPhase = "close";
+      e.stopTimer = STOP_TIME / 2;
+    }
+  } else if (e.stopPhase === "leave") {
+    const p = e.leaving.pop();
+    e.cabin = e.cabin.filter((x) => x !== p);
+    delivered++;
     const dur = simHours - p.arrived;
     durations.push(dur);
     if (dur > maxDur) maxDur = dur;
-  }
-  const room = CAPACITY - e.cabin.length;
-  const take = [];
-  for (let i = waiters[f].length - 1; i >= 0 && take.length < room; i--) {
-    const p = waiters[f][i];
-    if ((p.target - f) * e.dir > 0) {
-      take.push(p);
-      waiters[f].splice(i, 1);
+    if (e.leaving.length > 0) {
+      e.stopTimer = BOARD_TIME;
+    } else if (e.entering.length > 0) {
+      e.stopPhase = "enter";
+      e.stopTimer = BOARD_TIME;
+    } else {
+      e.stopPhase = "close";
+      e.stopTimer = STOP_TIME / 2;
     }
+  } else if (e.stopPhase === "enter") {
+    e.cabin.push(e.entering.pop());
+    if (e.entering.length > 0) {
+      e.stopTimer = BOARD_TIME;
+    } else {
+      e.stopPhase = "close";
+      e.stopTimer = STOP_TIME / 2;
+    }
+  } else if (e.stopPhase === "close") {
+    e.stopPhase = null;
+    e.stopTimer = 0;
   }
-  e.cabin.push(...take);
-}
-
-function stopAt(e, f) {
-  e.pos = f;
-  const leaving = e.cabin.filter((p) => p.target === f).length;
-  const room = CAPACITY - (e.cabin.length - leaving);
-  let entering = 0;
-  for (const p of waiters[f]) {
-    if (entering < room && (p.target - f) * e.dir > 0) entering++;
-  }
-  e.stopTimer = STOP_TIME + (leaving + entering) * BOARD_TIME;
-  processStop(e, f);
 }
 
 const MAX_MOVE = 0.5;
@@ -175,10 +202,8 @@ function stepOnce(simDt) {
 
   const totalWaiting = waiters.reduce((a, q) => a + q.length, 0);
   for (const e of elevators) {
-    if (e.stopTimer > 0) {
-      e.stopTimer -= simDt;
-      processStop(e, Math.round(e.pos));
-      if (e.stopTimer <= 0) e.stopTimer = 0;
+    if (e.stopPhase !== null) {
+      advanceStop(e, simDt);
       continue;
     }
     if (totalWaiting === 0 && e.cabin.length === 0) {
@@ -227,7 +252,7 @@ function render() {
     const e = elevators[i];
     const car = $(`#car-${i}`);
     car.style.bottom = `${e.pos * pitch}px`;
-    car.classList.toggle("car-idle", e.stopTimer === 0 && e.cabin.length === 0 && waiters.reduce((a, q) => a + q.length, 0) === 0);
+    car.classList.toggle("car-idle", e.stopPhase === null && e.cabin.length === 0 && waiters.reduce((a, q) => a + q.length, 0) === 0);
     const arrow = $(`#dir-${i}`);
     arrow.textContent = e.dir > 0 ? "\u25b2" : "\u25bc";
     arrow.className = `car-arrow ${e.dir > 0 ? "up" : "down"}`;
