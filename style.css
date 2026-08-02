@@ -192,3 +192,16 @@ table#matrix input {
   margin-top: 4px;
   font-weight: 600;
 }
+
+#charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+#charts canvas {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}

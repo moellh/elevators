@@ -22,7 +22,7 @@
     </section>
 
     <div id="stats">
-      Time: <span id="statTime">0.00</span> h &middot; Served: <span id="statServed">0</span> &middot; Waiting: <span id="statWaiting">0</span>
+      Time: <span id="statTime">0.00</span> h &middot; Served: <span id="statServed">0</span> &middot; Waiting: <span id="statWaiting">0</span> &middot; Longest wait: <span id="statMaxWait">0.00</span> h &middot; Trips: <span id="statTrips">0</span>
     </div>
 
     <section id="matrix-wrap">
@@ -33,6 +33,11 @@
     <section id="building-wrap">
       <div id="floor-panel"></div>
       <div id="shafts"></div>
+    </section>
+
+    <section id="charts">
+      <canvas id="hist" width="560" height="180"></canvas>
+      <canvas id="line" width="560" height="180"></canvas>
     </section>
 
     <script src="script.js"></script>
