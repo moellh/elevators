@@ -386,36 +386,6 @@ table#matrix td.diag {
   filter: brightness(0.6);
 }
 
-.car.open {
-  box-shadow: 0 0 0 1px var(--fg);
-}
-
-.door {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  background: linear-gradient(to bottom, #3a3a3a, #222222);
-  box-shadow: inset 0 0 0 1px #1a1a1a;
-  transition: transform 0.18s ease-in-out;
-}
-
-.door.dl {
-  left: 0;
-}
-
-.door.dr {
-  right: 0;
-}
-
-.car.open .door.dl {
-  transform: translateX(-80%);
-}
-
-.car.open .door.dr {
-  transform: translateX(80%);
-}
-
 .car-hud {
   position: absolute;
   top: 50%;

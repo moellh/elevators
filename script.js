@@ -95,9 +95,10 @@ function buildBuilding() {
     const row = document.createElement("div");
     row.className = "frow";
     row.style.height = `${floorH}px`;
-    row.innerHTML = `<span class="flabel">F${f}</span>
-      <span class="fchip up" id="fwup-${f}"></span>
-      <span class="fchip down" id="fwdown-${f}"></span>`;
+    const chips = [];
+    if (f < N - 1) chips.push(`<span class="fchip up" id="fwup-${f}"></span>`);
+    if (f > 0) chips.push(`<span class="fchip down" id="fwdown-${f}"></span>`);
+    row.innerHTML = `<span class="flabel">F${f}</span>${chips.join("")}`;
     panel.appendChild(row);
   }
 
@@ -112,8 +113,7 @@ function buildBuilding() {
     car.className = "car";
     car.id = `car-${i}`;
     car.style.height = `${floorH * 0.7}px`;
-    car.innerHTML = `<div class="door dl"></div><div class="door dr"></div>
-      <div class="car-hud">
+    car.innerHTML = `<div class="car-hud">
         <span class="car-arrow" id="dir-${i}"></span>
         <span class="car-count" id="count-${i}"></span>
         <div class="car-fill"><div class="car-fill-bar" id="fill-${i}"></div></div>
@@ -262,7 +262,6 @@ function render() {
     const e = elevators[i];
     const car = $(`#car-${i}`);
     car.style.bottom = `${e.pos * floorH}px`;
-    car.classList.toggle("open", e.stopTimer > 0);
     car.classList.toggle("car-idle", e.stopTimer === 0 && e.cabin.length === 0 && waiters.reduce((a, q) => a + q.length, 0) === 0);
     const arrow = $(`#dir-${i}`);
     arrow.textContent = e.dir > 0 ? "\u25b2" : "\u25bc";
@@ -548,6 +547,7 @@ function applyConfig() {
     buildMatrix();
     buildBuilding();
     resetSim();
+    saveState();
   }
 }
 
@@ -558,12 +558,15 @@ function applyConfig() {
 
 $("#elevSpeed").addEventListener("input", () => {
   ELEV_SPEED = clamp(+$("#elevSpeed").value || 1.5, 0.1, 20);
+  saveState();
 });
 $("#stopTime").addEventListener("input", () => {
   STOP_TIME = clamp(+$("#stopTime").value || 0, 0, 10);
+  saveState();
 });
 $("#boardTime").addEventListener("input", () => {
   BOARD_TIME = clamp(+$("#boardTime").value || 0, 0, 5);
+  saveState();
 });
 
 document.addEventListener(
@@ -586,6 +589,7 @@ document.addEventListener(
   (e) => {
     if (e.target.matches && e.target.matches("#matrix input:not(:disabled)")) {
       readMatrix();
+      saveState();
     }
   },
   { passive: true }
@@ -601,11 +605,58 @@ $("#reset").addEventListener("click", () => {
   resetSim();
 });
 
+const STORAGE_KEY = "elevator-sim";
+
+function saveState() {
+  try {
+    const state = { N, M, CAPACITY, SPEED, ELEV_SPEED, STOP_TIME, BOARD_TIME, matrix };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    N = clamp(Math.round(+s.N) || 6, 2, 20);
+    M = clamp(Math.round(+s.M) || 2, 1, 8);
+    CAPACITY = clamp(Math.round(+s.CAPACITY) || 8, 1, 30);
+    SPEED = Math.max(1, +s.SPEED || 1);
+    ELEV_SPEED = clamp(+s.ELEV_SPEED || 1.5, 0.1, 20);
+    STOP_TIME = clamp(+s.STOP_TIME ?? 5, 0, 10);
+    BOARD_TIME = clamp(+s.BOARD_TIME ?? 1.5, 0, 5);
+    if (Array.isArray(s.matrix) && s.matrix.length === N) {
+      matrix = s.matrix.map((row) => row.slice());
+    }
+    $("#n").value = N;
+    $("#m").value = M;
+    $("#cap").value = CAPACITY;
+    $("#speed").value = SPEED;
+    $("#elevSpeed").value = ELEV_SPEED;
+    $("#stopTime").value = STOP_TIME;
+    $("#boardTime").value = BOARD_TIME;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 $("#speed").addEventListener("input", () => {
   SPEED = Math.max(1, +$("#speed").value || 1);
+  saveState();
 });
 
+const loaded = loadState();
+const savedMatrix = loaded && Array.isArray(matrix) ? matrix.map((r) => r.slice()) : null;
 buildMatrix();
+if (savedMatrix && savedMatrix.length === N) {
+  document.querySelectorAll("#matrix input:not(:disabled)").forEach((inp) => {
+    const v = savedMatrix[+inp.dataset.from][+inp.dataset.to];
+    if (v !== undefined) inp.value = v;
+  });
+  readMatrix();
+}
 buildBuilding();
 resetSim();
 $("#toggle").textContent = "Start";
