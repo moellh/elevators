@@ -102,12 +102,12 @@ els.speed.addEventListener("input", bindNumber("speed", "speed", DEFAULTS.speed,
 // --- scenario controls ---
 
 els.scenario1toN.addEventListener("click", () => {
-  sim.applyScenario("in", +els.scenarioStory.value, +els.scenarioPeople.value);
+  sim.applyScenario("out", +els.scenarioStory.value, +els.scenarioPeople.value);
   persist();
 });
 
 els.scenarioNto1.addEventListener("click", () => {
-  sim.applyScenario("out", +els.scenarioStory.value, +els.scenarioPeople.value);
+  sim.applyScenario("in", +els.scenarioStory.value, +els.scenarioPeople.value);
   persist();
 });
 
@@ -168,7 +168,7 @@ const loaded = loadState();
 if (loaded?.matrix) {
   sim.loadMatrix(loaded.matrix);
 } else {
-  sim.applyScenario("in", config.scenarioStory, config.scenarioPeople);
+  sim.applyScenario("out", config.scenarioStory, config.scenarioPeople);
   persist();
 }
 
