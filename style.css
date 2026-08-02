@@ -32,7 +32,7 @@ body {
   min-height: 100vh;
   padding: 40px 48px 80px;
   line-height: 1.5;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 /* ---------- top ---------- */
@@ -48,7 +48,7 @@ body {
 }
 
 .topbar h1 {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -76,7 +76,7 @@ body {
 }
 
 .control label {
-  font-size: 10px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--gray-3);
@@ -89,7 +89,7 @@ body {
   border-bottom: 1px solid var(--gray-4);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 14px;
   padding: 2px 0 4px;
   border-radius: 0;
   outline: none;
@@ -117,7 +117,7 @@ body {
   border: none;
   color: var(--gray-2);
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   padding: 2px 0;
   cursor: pointer;
@@ -163,7 +163,7 @@ body {
 
 .stat-label {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--gray-3);
@@ -172,13 +172,13 @@ body {
 
 .stat-value {
   font-family: var(--mono);
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .stat-unit {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--gray-3);
   margin-left: 3px;
 }
@@ -213,7 +213,7 @@ main {
 }
 
 .card-head h2 {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -221,7 +221,7 @@ main {
 }
 
 .card-sub {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--gray-3);
 }
 
@@ -243,7 +243,7 @@ table#matrix td {
 }
 
 table#matrix thead th {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--gray-3);
   font-weight: 500;
   padding-bottom: 8px;
@@ -252,7 +252,7 @@ table#matrix thead th {
 
 table#matrix tbody td:first-child,
 table#matrix thead th:first-child {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--gray-3);
   font-weight: 500;
 }
@@ -265,7 +265,7 @@ table#matrix input {
   border-bottom: 1px solid var(--line);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   padding: 2px 2px 4px;
   border-radius: 0;
   text-align: center;
@@ -306,16 +306,15 @@ table#matrix td.diag {
   flex-direction: column;
   justify-content: center;
   gap: 1px;
-  border-bottom: 1px solid var(--gray-5);
   padding-right: 12px;
 }
 
 .frow:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .flabel {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
@@ -323,7 +322,7 @@ table#matrix td.diag {
 
 .fchip {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.4;
 }
 
@@ -355,8 +354,8 @@ table#matrix td.diag {
 
 .shaft {
   position: relative;
-  background-image: linear-gradient(to top, var(--line) 1px, transparent 1px);
-  background-size: 100% var(--fh);
+  background-image: linear-gradient(to top, transparent calc(100% - 1px), var(--line) 1px);
+  background-size: 100% var(--pitch);
   border-left: 1px solid var(--gray-5);
   border-right: 1px solid var(--gray-5);
   background-color: transparent;
@@ -364,7 +363,7 @@ table#matrix td.diag {
 
 .shaft-name {
   text-align: center;
-  font-size: 10px;
+  font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--gray-3);
@@ -401,7 +400,7 @@ table#matrix td.diag {
 }
 
 .car-arrow {
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1;
   color: var(--gray-3);
 }
@@ -416,7 +415,7 @@ table#matrix td.diag {
 
 .car-count {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--fg);
 }

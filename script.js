@@ -81,20 +81,26 @@ function readMatrix() {
 }
 
 function buildBuilding() {
-  const floorH = 60;
+  const carH = 48;
+  const gap = 14;
+  const pitch = carH + gap;
+  const totalH = N * carH + (N - 1) * gap;
   const root = document.documentElement;
-  root.style.setProperty("--fh", floorH + "px");
+  root.style.setProperty("--fh", carH + "px");
+  root.style.setProperty("--gap", gap + "px");
+  root.style.setProperty("--pitch", pitch + "px");
   const wrap = $("#building-wrap");
   const panel = $("#floor-panel");
   const shafts = $("#shafts");
   panel.innerHTML = "";
   shafts.innerHTML = "";
-  wrap.style.height = `${N * floorH}px`;
+  wrap.style.height = `${totalH}px`;
 
   for (let f = N - 1; f >= 0; f--) {
     const row = document.createElement("div");
     row.className = "frow";
-    row.style.height = `${floorH}px`;
+    row.style.height = `${carH}px`;
+    row.style.marginBottom = f > 0 ? `${gap}px` : "0";
     const chips = [];
     if (f < N - 1) chips.push(`<span class="fchip up" id="fwup-${f}"></span>`);
     if (f > 0) chips.push(`<span class="fchip down" id="fwdown-${f}"></span>`);
@@ -105,14 +111,14 @@ function buildBuilding() {
   for (let i = 0; i < M; i++) {
     const col = document.createElement("div");
     col.className = "shaft-col";
-    col.style.height = `${N * floorH}px`;
+    col.style.height = `${totalH}px`;
     const shaft = document.createElement("div");
     shaft.className = "shaft";
-    shaft.style.height = `${N * floorH}px`;
+    shaft.style.height = `${totalH}px`;
     const car = document.createElement("div");
     car.className = "car";
     car.id = `car-${i}`;
-    car.style.height = `${floorH * 0.7}px`;
+    car.style.height = `${carH}px`;
     car.innerHTML = `<div class="car-hud">
         <span class="car-arrow" id="dir-${i}"></span>
         <span class="car-count" id="count-${i}"></span>
@@ -257,11 +263,11 @@ function arrivedAt(prevPos, pos, dir) {
 }
 
 function render() {
-  const floorH = 60;
+  const pitch = 48 + 14;
   for (let i = 0; i < M; i++) {
     const e = elevators[i];
     const car = $(`#car-${i}`);
-    car.style.bottom = `${e.pos * floorH}px`;
+    car.style.bottom = `${e.pos * pitch}px`;
     car.classList.toggle("car-idle", e.stopTimer === 0 && e.cabin.length === 0 && waiters.reduce((a, q) => a + q.length, 0) === 0);
     const arrow = $(`#dir-${i}`);
     arrow.textContent = e.dir > 0 ? "\u25b2" : "\u25bc";
