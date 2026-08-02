@@ -304,15 +304,15 @@ function render() {
 
 const CHART = {
   bg: "rgba(255,255,255,0)",
-  grid: "rgba(154,164,178,0.10)",
-  axis: "rgba(154,164,178,0.45)",
-  text: "#9aa4b2",
-  label: "#6b7482",
-  histFill: "#4f9cf9",
-  histFillTop: "#8ec1ff",
-  line: "#e3b341",
-  areaTop: "rgba(227,179,65,0.22)",
-  areaBot: "rgba(227,179,65,0)",
+  grid: "rgba(255,255,255,0.06)",
+  axis: "rgba(255,255,255,0.25)",
+  text: "#b3b3b3",
+  label: "#777777",
+  histFill: "#4a4a4a",
+  histFillTop: "#8a8a8a",
+  line: "#f0b429",
+  areaTop: "rgba(240,180,41,0.18)",
+  areaBot: "rgba(240,180,41,0)",
 };
 
 function roundRect(ctx, x, y, w, h, r) {
