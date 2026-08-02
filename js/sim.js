@@ -92,17 +92,7 @@ export class Simulation {
     this.reset();
   }
 
-  loadMatrix(matrix) {
-    if (!Array.isArray(matrix) || matrix.length !== this.N) return;
-    for (let a = 0; a < this.N; a++) {
-      for (let b = 0; b < this.N; b++) {
-        this.matrix[a][b] = +matrix[a]?.[b] || 0;
-      }
-    }
-  }
-
-  step(realDt) {
-    const { speed, elevSpeed } = this.config;
+  step(realDt) {    const { speed, elevSpeed } = this.config;
     const h = Math.min(0.1, MAX_MOVE / elevSpeed);
     let remaining = realDt * speed;
     while (remaining > 1e-9) {

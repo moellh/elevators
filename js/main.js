@@ -1,4 +1,4 @@
-import { clamp, BOUNDS, DEFAULTS, sanitizeConfig, saveState, loadState } from "./config.js";
+import { clamp, BOUNDS, DEFAULTS } from "./config.js";
 import { Simulation } from "./sim.js";
 import { BuildingView } from "./building.js";
 import { Charts } from "./charts.js";
@@ -26,7 +26,7 @@ const els = {
   statTrips: $("#statTrips"),
 };
 
-const config = sanitizeConfig(loadState() ?? DEFAULTS);
+const config = { ...DEFAULTS };
 const sim = new Simulation(config);
 const building = new BuildingView($("#building-wrap"));
 const charts = new Charts($("#hist"), $("#line"));
@@ -50,11 +50,6 @@ function applyDimensions() {
   if (els.scenarioStory.value > config.stories - 1) els.scenarioStory.value = 0;
   sim.resize();
   building.build(config);
-  persist();
-}
-
-function persist() {
-  saveState(config, sim.matrix);
 }
 
 function render() {
@@ -91,7 +86,6 @@ const bindNumber = (id, key, fallback, bounds, round) => (e) => {
   const raw = round ? Math.round(+els[id].value) : +els[id].value;
   config[key] = clamp(raw || fallback, ...bounds);
   els[id].value = config[key];
-  persist();
 };
 
 els.elevSpeed.addEventListener("input", bindNumber("elevSpeed", "elevSpeed", DEFAULTS.elevSpeed, BOUNDS.elevSpeed, false));
@@ -103,19 +97,16 @@ els.speed.addEventListener("input", bindNumber("speed", "speed", DEFAULTS.speed,
 
 els.scenario1toN.addEventListener("click", () => {
   sim.applyScenario("out", +els.scenarioStory.value, +els.scenarioPeople.value);
-  persist();
 });
 
 els.scenarioNto1.addEventListener("click", () => {
   sim.applyScenario("in", +els.scenarioStory.value, +els.scenarioPeople.value);
-  persist();
 });
 
 for (const id of ["scenarioStory", "scenarioPeople"]) {
   els[id].addEventListener("input", () => {
     config.scenarioStory = Math.max(0, Math.round(+els.scenarioStory.value) || 0);
     config.scenarioPeople = Math.max(0, Math.round(+els.scenarioPeople.value) || 0);
-    persist();
   });
 }
 
@@ -164,13 +155,7 @@ function syncInputs() {
 
 syncInputs();
 
-const loaded = loadState();
-if (loaded?.matrix) {
-  sim.loadMatrix(loaded.matrix);
-} else {
-  sim.applyScenario("out", config.scenarioStory, config.scenarioPeople);
-  persist();
-}
+sim.applyScenario("out", config.scenarioStory, config.scenarioPeople);
 
 building.build(config);
 els.toggle.textContent = "Start";
