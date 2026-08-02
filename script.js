@@ -1,8 +1,8 @@
-let ELEV_SPEED = 2;
-let STOP_TIME = 0.8;
-let BOARD_TIME = 0.1;
+let ELEV_SPEED = 1.5;
+let STOP_TIME = 2;
+let BOARD_TIME = 0.5;
 
-let N = 3;
+let N = 6;
 let M = 2;
 let CAPACITY = 8;
 let SPEED = 2;
@@ -182,12 +182,13 @@ function stopAt(e, f) {
   processStop(e, f);
 }
 
-const SIM_H = 0.02;
+const MAX_MOVE = 0.5;
 
 function step(realDt) {
+  const h = Math.min(0.1, MAX_MOVE / ELEV_SPEED);
   let remaining = realDt * SPEED;
   while (remaining > 1e-9) {
-    const d = Math.min(SIM_H, remaining);
+    const d = Math.min(h, remaining);
     stepOnce(d);
     remaining -= d;
   }
@@ -556,7 +557,7 @@ function applyConfig() {
 });
 
 $("#elevSpeed").addEventListener("input", () => {
-  ELEV_SPEED = clamp(+$("#elevSpeed").value || 2, 0.1, 20);
+  ELEV_SPEED = clamp(+$("#elevSpeed").value || 1.5, 0.1, 20);
 });
 $("#stopTime").addEventListener("input", () => {
   STOP_TIME = clamp(+$("#stopTime").value || 0, 0, 10);
@@ -609,8 +610,7 @@ $("#reset").addEventListener("click", () => {
 });
 
 $("#speed").addEventListener("input", () => {
-  SPEED = clamp(+$("#speed").value || 1, 1, 120);
-  $("#speed").value = SPEED;
+  SPEED = Math.max(1, +$("#speed").value || 1);
 });
 
 buildMatrix();
