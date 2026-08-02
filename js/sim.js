@@ -1,10 +1,23 @@
 const MAX_MOVE = 0.5;
 const SECONDS_PER_HOUR = 3600;
 
+// Deterministic PRNG (mulberry32) so runs are reproducible across processes.
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export class Passenger {
-  constructor(target, arrived) {
+  constructor(target, arrived, seq) {
     this.target = target;
     this.arrived = arrived;
+    this.seq = seq; // global FIFO sequence number
     this.car = null;
   }
 }
@@ -48,6 +61,8 @@ export class Simulation {
     this.durations = [];
     this.series = [];
     this.lastSample = 0;
+    this.rng = makeRng(config.seed ?? 1);
+    this.seq = 0;
     this.resize();
   }
 
@@ -106,7 +121,8 @@ export class Simulation {
 
   step(realDt) {
     const { speed, elevSpeed } = this.config;
-    const h = Math.min(0.1, MAX_MOVE / elevSpeed);
+    // Bound movement per substep to < 1 floor so floor-crossing detection works.
+    const h = Math.min(0.5, MAX_MOVE / elevSpeed);
     let remaining = realDt * speed;
     while (remaining > 1e-9) {
       const d = Math.min(h, remaining);
@@ -141,9 +157,10 @@ export class Simulation {
         if (from === to) continue;
         const expected = this.matrix[from][to] * (1 / SECONDS_PER_HOUR) * simDt;
         const p = expected - Math.floor(expected);
-        const n = Math.floor(expected) + (Math.random() < p ? 1 : 0);
+        const r = this.rng();
+        const n = Math.floor(expected) + (r < p ? 1 : 0);
         for (let k = 0; k < n; k++) {
-          const passenger = new Passenger(to, this.simHours);
+          const passenger = new Passenger(to, this.simHours, this.seq++);
           this.waiters[from].push(passenger);
           this.dispatch(passenger, from);
         }
@@ -192,8 +209,10 @@ export class Simulation {
     }
   }
 
-  // If demand vanishes mid-flight, glide to the next story and stop there.
+  // Idle elevator with nothing to do and no demand anywhere: it may simply
+  // stay put (no forced stop). If mid-flight, glide to the nearest story.
   settle(e, simDt) {
+    if (this.totalWaiting > 0) return;
     if (e.pos !== Math.round(e.pos)) {
       const target = e.dir > 0 ? Math.ceil(e.pos) : Math.floor(e.pos);
       e.pos += e.dir * this.config.elevSpeed * simDt;
@@ -225,15 +244,29 @@ export class Simulation {
     return up >= down ? 1 : -1;
   }
 
-  // Empty elevator with nothing to do: park at the busiest floor so it is
-  // ready for the next wave of passengers.
+  // Empty elevator with nothing to do: cruise toward the busiest floor so it is
+  // ready for the next wave. Movement is free — it does not commit a stop and
+  // may reverse/continue however the strategy chooses.
   idlePark(e) {
     if (this.totalWaiting === 0) return false;
     const target = this.busiestFloor();
-    const dir = this.dominantDirection(target);
-    e.pickups.set(target, dir);
-    e.dir = dir;
+    e.parkTarget = target;
+    e.dir = target > e.pos ? 1 : target < e.pos ? -1 : e.dir;
     return true;
+  }
+
+  // Move an idle car freely toward its park target, without stopping.
+  cruise(e, simDt) {
+    const target = e.parkTarget;
+    if (target == null) return;
+    if (target > e.pos + 1e-6) e.dir = 1;
+    else if (target < e.pos - 1e-6) e.dir = -1;
+    const prevPos = e.pos;
+    e.pos += e.dir * this.config.elevSpeed * simDt;
+    if (e.pos >= this.N - 1) { e.pos = this.N - 1; e.dir = -1; }
+    else if (e.pos <= 0) { e.pos = 0; e.dir = 1; }
+    // if we crossed the target, stop cruising
+    if ((target - prevPos) * (target - e.pos) <= 0) e.parkTarget = null;
   }
 
   hasStopAhead(e, dir) {
@@ -266,7 +299,8 @@ export class Simulation {
           return;
         }
       } else if (this.idlePark(e)) {
-        // will move next step toward the parked floor
+        this.cruise(e, simDt);
+        return;
       } else {
         this.settle(e, simDt);
         return;
@@ -319,9 +353,16 @@ export class Simulation {
   }
 
   boardOne(e, f) {
-    const idx = this.waiters[f].findIndex((p) => (p.target - f) * e.dir > 0);
-    if (idx === -1) return false;
-    e.cabin.push(this.waiters[f].splice(idx, 1)[0]);
+    // FIFO: board the oldest eligible passenger in this direction.
+    let bestIdx = -1;
+    for (let i = 0; i < this.waiters[f].length; i++) {
+      const p = this.waiters[f][i];
+      if ((p.target - f) * e.dir > 0 && (bestIdx === -1 || p.seq < this.waiters[f][bestIdx].seq)) {
+        bestIdx = i;
+      }
+    }
+    if (bestIdx === -1) return false;
+    e.cabin.push(this.waiters[f].splice(bestIdx, 1)[0]);
     this.clearPickup(f, e.dir);
     return true;
   }
