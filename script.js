@@ -1,6 +1,6 @@
 let ELEV_SPEED = 1.5;
-let STOP_TIME = 2;
-let BOARD_TIME = 0.5;
+let STOP_TIME = 5;
+let BOARD_TIME = 1.5;
 
 let N = 6;
 let M = 2;
@@ -590,14 +590,6 @@ document.addEventListener(
   },
   { passive: true }
 );
-
-$("#randomize").addEventListener("click", () => {
-  readMatrix();
-  document.querySelectorAll("#matrix input:not(:disabled)").forEach((inp) => {
-    inp.value = Math.floor(Math.random() * 200);
-    matrix[+inp.dataset.from][+inp.dataset.to] = +inp.value;
-  });
-});
 
 $("#toggle").addEventListener("click", () => {
   running = !running;
