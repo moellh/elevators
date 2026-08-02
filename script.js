@@ -164,13 +164,13 @@ function step(dt) {
   const rate = SPEED / 3600;
   for (let from = 0; from < N; from++) {
     for (let to = 0; to < N; to++) {
-      if (f === g) continue;
-      const expected = matrix[f][g] * rate * dt;
+      if (from === to) continue;
+      const expected = matrix[from][to] * rate * dt;
       const p = expected - Math.floor(expected);
       const r = Math.random();
       let n = Math.floor(expected);
       if (r < p) n += 1;
-      for (let k = 0; k < n; k++) waiters[f].push({ target: g, arrived: simHours });
+      for (let k = 0; k < n; k++) waiters[from].push({ target: to, arrived: simHours });
     }
   }
 
